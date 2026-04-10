@@ -1,0 +1,12 @@
+{
+  "reporterEnabled": "spec, allure-mocha, mochawesome",
+  "allureMochaReporterOptions": {
+    "resultsDir": "allure-results"
+  },
+  "mochawesomeReporterOptions": {
+    "reportDir": "artifacts/api-report",
+    "reportFilename": "index",
+    "reportTitle": "ServeRest API",
+    "inline": true
+  }
+}

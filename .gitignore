@@ -1,0 +1,14 @@
+node_modules/
+allure-results/
+allure-report/
+artifacts/
+apps/*.apk
+apps/*.zip
+apps/*.app
+.DS_Store
+.env
+.env.*
+!.env.example
+.gitlab-ci-local/
+xunit.xml
+

@@ -1,0 +1,72 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+stages:
+  - test
+
+# Testes de API (ServeRest) — Allure em allure-results/ + Mochawesome em artifacts/api-report/
+api_tests:
+  stage: test
+  image: node:20-bookworm
+  script:
+    - mkdir -p artifacts/api-report allure-results
+    - npm ci --no-audit --no-fund --cache "$NPM_CACHE_FOLDER"
+    - npm run test:api:ci
+  artifacts:
+    when: always
+    paths:
+      - allure-results/
+      - artifacts/api-report/
+    expire_in: 14 days
+
+variables:
+  NPM_CACHE_FOLDER: '$CI_PROJECT_DIR/.npm'
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .npm/
+
+# Os testes E2E mobile necessitam de simulador/emulador local ou de credenciais BrowserStack.
+# BrowserStack: BROWSERSTACK_USERNAME + BROWSERSTACK_ACCESS_KEY (obrigatórias para o job e2e_browserstack_android).
+# BROWSERSTACK_APP_URL é opcional (por defeito no wdio.browserstack.conf.js).
+
+e2e_browserstack_android:
+  stage: test
+  image: node:20-bookworm
+  rules:
+    - if: '$BROWSERSTACK_USERNAME && $BROWSERSTACK_ACCESS_KEY'
+  script:
+    - mkdir -p allure-results artifacts
+    - npm install --no-audit --no-fund --cache "$NPM_CACHE_FOLDER"
+    - npm run test:bs
+  artifacts:
+    when: always
+    paths:
+      - allure-results/
+      - artifacts/
+    expire_in: 14 days
+
+e2e_android_local_emulator:
+  stage: test
+  image: node:20-bookworm
+  rules:
+    - when: manual
+  allow_failure: true
+  script: |
+    set -e
+    mkdir -p allure-results artifacts
+    echo "Requer runner com Android SDK, emulador e Appium. Em alternativa, execute localmente: npm run test:android"
+    mkdir -p apps
+    curl -fsSL -o apps/android.wdio.native.app.v2.2.0.apk "https://github.com/webdriverio/native-demo-app/releases/download/v2.2.0/android.wdio.native.app.v2.2.0.apk"
+    npm install --no-audit --no-fund --cache "$NPM_CACHE_FOLDER"
+    export ANDROID_APP_PATH="$CI_PROJECT_DIR/apps/android.wdio.native.app.v2.2.0.apk"
+    npm run test:android
+  artifacts:
+    when: always
+    paths:
+      - allure-results/
+      - artifacts/
+    expire_in: 7 days
