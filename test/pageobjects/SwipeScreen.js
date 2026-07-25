@@ -1,5 +1,5 @@
 const AppScreen = require('./AppScreen');
-const { swipeUp, swipeLeft } = require('../helpers/mobileSwipe');
+const { swipeUp, swipeLeft, swipeHorizontalInRect } = require('../helpers/mobileSwipe');
 const { runNativeDemoInspectorSwipeSequence } = require('../helpers/nativeDemoInspectorSwipeSequence');
 
 const SWIPE_SCREEN_SELECTOR = '~Swipe-screen';
@@ -98,8 +98,10 @@ class SwipeScreen extends AppScreen {
     const { left, top, boxWidth, boxHeight, height: windowHeight, swipeSpeed, swipePercent, flingSpeed } =
       area;
 
+    let moved = false;
+
     try {
-      await browser.execute('mobile: flingGesture', {
+      const flingOk = await browser.execute('mobile: flingGesture', {
         left,
         top,
         width: boxWidth,
@@ -107,7 +109,12 @@ class SwipeScreen extends AppScreen {
         direction: 'left',
         speed: flingSpeed,
       });
+      moved = flingOk === true;
     } catch {
+      /* Appium 1.x na nuvem pode não suportar flingGesture */
+    }
+
+    if (!moved) {
       try {
         await browser.execute('mobile: swipeGesture', {
           left,
@@ -118,13 +125,59 @@ class SwipeScreen extends AppScreen {
           percent: swipePercent,
           speed: swipeSpeed,
         });
+        moved = true;
       } catch {
-        const yPct = (top + boxHeight / 2) / windowHeight;
-        await swipeLeft(driver, {
-          yPct: Math.min(0.92, Math.max(0.08, yPct)),
-          moveDuration: 650,
-        });
+        /* ignore */
       }
+    }
+
+    if (!moved) {
+      try {
+        await browser.execute('mobile: scrollGesture', {
+          left,
+          top,
+          width: boxWidth,
+          height: boxHeight,
+          direction: 'left',
+          percent: swipePercent,
+          speed: swipeSpeed,
+        });
+        moved = true;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!moved && process.env.BROWSERSTACK_USERNAME) {
+      await swipeHorizontalInRect(driver, {
+        left,
+        top,
+        width: boxWidth,
+        height: boxHeight,
+      });
+      moved = true;
+    }
+
+    // W3C pointer actions podem bloquear no App Automate (Appium 1.x); evitar na nuvem.
+    if (!moved && !process.env.BROWSERSTACK_USERNAME) {
+      const yPct = (top + boxHeight / 2) / windowHeight;
+      await swipeLeft(driver, {
+        yPct: Math.min(0.92, Math.max(0.08, yPct)),
+        moveDuration: 650,
+      });
+    }
+  }
+
+  /**
+   * Carrossel no BrowserStack: `mobile: swipe` até o último slide ou limite de tentativas.
+   */
+  async swipeCarouselForCloudAndroid() {
+    const maxSwipes = parseInt(process.env.BROWSERSTACK_CAROUSEL_SWIPES || '4', 10);
+
+    for (let i = 0; i < maxSwipes; i++) {
+      const area = await this.androidCarouselSwipeArea();
+      await this.androidSwipeCarouselHorizontal(area);
+      await browser.pause(500);
     }
   }
 
@@ -145,13 +198,22 @@ class SwipeScreen extends AppScreen {
   }
 
   async swipeCarouselToLastSlideAndroid() {
-    if (process.env.ANDROID_USE_LEGACY_CAROUSEL_SWIPE === '1') {
+    const useLegacy = process.env.ANDROID_USE_LEGACY_CAROUSEL_SWIPE === '1';
+
+    if (!useLegacy) {
+      try {
+        await runNativeDemoInspectorSwipeSequence(driver);
+      } catch {
+        for (let i = 0; i < 5; i++) {
+          await this.swipeCarouselNext();
+          await browser.pause(480);
+        }
+      }
+    } else {
       for (let i = 0; i < 5; i++) {
         await this.swipeCarouselNext();
         await browser.pause(480);
       }
-    } else {
-      await runNativeDemoInspectorSwipeSequence(driver);
     }
     await browser.pause(400);
     const lastTitle = this.androidLastCarouselTitle;

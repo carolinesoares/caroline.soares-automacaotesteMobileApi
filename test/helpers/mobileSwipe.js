@@ -36,7 +36,11 @@ async function pointerSwipe(drv, opts) {
       ],
     },
   ]);
-  await drv.releaseActions();
+  try {
+    await drv.releaseActions();
+  } catch {
+    /* Appium 1.x / alguns clouds não implementam DELETE /actions */
+  }
 }
 
 /** Centro horizontal; baixo (80%) → cima (20%). */
@@ -91,10 +95,36 @@ async function swipeRight(drv, options = {}) {
   });
 }
 
+async function swipeHorizontalInRect(drv, { left, top, width, height, moveDuration = 800 }) {
+  const y = top + Math.floor(height / 2);
+  const xStart = left + width - 24;
+  const xEnd = left + 24;
+
+  await drv.performActions([
+    {
+      type: 'pointer',
+      id: 'finger1',
+      parameters: { pointerType: 'touch' },
+      actions: [
+        { type: 'pointerMove', duration: 0, x: xStart, y },
+        { type: 'pointerDown', button: 0 },
+        { type: 'pointerMove', duration: moveDuration, x: xEnd, y },
+        { type: 'pointerUp', button: 0 },
+      ],
+    },
+  ]);
+  try {
+    await drv.releaseActions();
+  } catch {
+    /* App Automate (Appium 1.x): performActions OK, DELETE /actions falha */
+  }
+}
+
 module.exports = {
   pointerSwipe,
   swipeUp,
   swipeDown,
   swipeLeft,
   swipeRight,
+  swipeHorizontalInRect,
 };

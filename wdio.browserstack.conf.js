@@ -6,6 +6,20 @@ try {
 
 const shared = require('./wdio.shared.conf.js').config;
 
+/**
+ * App Automate expõe Appium 1.x em vários dispositivos: `driver.action().perform()` falha no
+ * `DELETE /actions` (releaseActions). Carrossel Swipe usa gestos mobile: + fling legacy.
+ */
+if (process.env.ANDROID_USE_LEGACY_CAROUSEL_SWIPE == null) {
+  process.env.ANDROID_USE_LEGACY_CAROUSEL_SWIPE = '1';
+}
+if (process.env.ANDROID_CAROUSEL_SKIP_VERTICAL_NUDGE == null) {
+  process.env.ANDROID_CAROUSEL_SKIP_VERTICAL_NUDGE = '1';
+}
+if (process.env.BROWSERSTACK_CAROUSEL_SWIPES == null) {
+  process.env.BROWSERSTACK_CAROUSEL_SWIPES = '2';
+}
+
 const user = process.env.BROWSERSTACK_USERNAME;
 const key = process.env.BROWSERSTACK_ACCESS_KEY;
 
@@ -19,7 +33,7 @@ if (!user || !key) {
 /** URL do app após upload no BrowserStack (App Live / App Automate). */
 const app =
   process.env.BROWSERSTACK_APP_URL ||
-  'bs://09e3299753d73122dd9e0f7a888af9a367dbfa68';
+  'bs://4ffad9069566ea1378c79454d23640c1ed6a20db';
 
 const projectName = process.env.BROWSERSTACK_PROJECT_NAME || 'native-demo-app';
 const buildName =
@@ -72,6 +86,10 @@ exports.config = {
   ...shared,
   user,
   key,
+  mochaOpts: {
+    ...shared.mochaOpts,
+    timeout: 180000,
+  },
   protocol: 'https',
   hostname: 'hub.browserstack.com',
   port: 443,

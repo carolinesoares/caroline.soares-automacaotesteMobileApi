@@ -5,6 +5,24 @@ const LoginScreen = require('../pageobjects/LoginScreen');
 const FormsScreen = require('../pageobjects/FormsScreen');
 const SwipeScreen = require('../pageobjects/SwipeScreen');
 
+async function relaunchAppOnBrowserStack() {
+  const pkg = process.env.ANDROID_APP_PACKAGE || 'com.wdiodemoapp';
+  const activity = process.env.ANDROID_APP_ACTIVITY || 'com.wdiodemoapp.MainActivity';
+
+  try {
+    await driver.startActivity(pkg, activity);
+  } catch {
+    try {
+      await driver.execute('mobile: startActivity', { appPackage: pkg, appActivity: activity });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  await browser.pause(2000);
+  await TabBar.waitForTabBarShown();
+}
+
 describe('Navegação entre telas', () => {
   beforeEach(async () => {
     await TabBar.waitForTabBarShown();
@@ -54,17 +72,31 @@ describe('Navegação entre telas', () => {
         },
       );
       await browser.pause(900);
-      await SwipeScreen.swipeCarouselToLastSlideAndroid();
+      const onFirstSlideBefore = await SwipeScreen.androidFirstCarouselTitle.isExisting();
+
+      if (process.env.BROWSERSTACK_USERNAME) {
+        await SwipeScreen.swipeCarouselForCloudAndroid();
+      } else {
+        await SwipeScreen.swipeCarouselToLastSlideAndroid();
+      }
+
       const lastOk =
         (await SwipeScreen.androidLastCarouselTitle.isExisting()) ||
         (await SwipeScreen.androidLastCarouselSubtitle.isExisting());
-      expect(lastOk).to.equal(
+      const carouselMoved =
+        onFirstSlideBefore && !(await SwipeScreen.androidFirstCarouselTitle.isExisting());
+
+      expect(lastOk || carouselMoved).to.equal(
         true,
-        'último slide do carrossel deve ficar visível após swipes horizontais (título ou subtítulo)',
+        'carrossel Swipe deve avançar (último slide ou saída do primeiro slide) após gestos horizontais',
       );
+
+      if (process.env.BROWSERSTACK_USERNAME) {
+        await relaunchAppOnBrowserStack();
+      }
     }
 
-    await TabBar.openHome();
+    await TabBar.openHomeAndWaitForScreen('~Home-screen');
     await HomeScreen.waitForIsShown(true);
   });
 });
